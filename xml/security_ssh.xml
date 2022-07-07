@@ -861,40 +861,41 @@ Have a lot of fun...</screen>
   </para>
  </sect1>
 
-  <!-- this is awesome sauce
   <sect1 xml:id="sec-ssh-certificate-auth">
   <title>OpenSSH certificate authentication</title>
   <para>
    OpenSSH introduced certificate authentication in OpenSSH 5.4. This is
-   similar to an OpenSSL certificate authority, and serves a similar
+   similar to an OpenSSL certificate authority (CA), and serves a similar
    purpose: setting up a central authority for public key authentication
    that verifies and manages encryption certificates.
   </para>
   <para>
    Traditional OpenSSH public key authentication requires copying client
    public keys to every SSH server they need access to, and relying on
-   users to verify new host keys before accepting them. Both methods are
-   error-prone and complicated to manage, especially for distributing client
-   public keys.
+   users to verify new SSH server host keys before accepting them. Both
+   methods are error-prone and complicated to manage.
   </para>
   <para>
-   Host keys are automatically presented to a client on their first
-   connection attempt, and the user chooses whether or not to accept them.
-   The server presents the host key fingerprint for the user to verify that
-   it is legitimate. However, trusting all users to always follow this
+   Host keys are automatically presented to a client on their
+   first connection attempt, and the user chooses whether or not to accept
+   them. The server presents the host key fingerprint for the user to verify
+   that it is legitimate. However, trusting all users to always follow this
    procedure may not be the best approach. Using certificate authentication
    makes it easier to distribute, verify, and manage host and client keys.
   </para>
   <para>
+   Another weakness is OpenSSH keys never expire.
+  </para>
+  <para>
    If you are used to managing OpenSSL certificate authorities, you will
-   find that managing an OpenSSH certificate authority is simpler. The basic
-   principles are similar:
+   find that managing an OpenSSH CA is simpler. The basic principles are
+   similar:
   </para>
  <itemizedlist>
   <listitem>
   <para>
-   Set up a trusted server for creating and signing new host and client
-   keys.
+   Set up a trusted server to host your certificate authority, for creating
+   and signing new host and client keys.
   </para>
   </listitem>
   <listitem>
@@ -913,15 +914,52 @@ Have a lot of fun...</screen>
   </para>
   </listitem>
  </itemizedlist>
- <sect2 xml:id="sec-ssh-certificate-create-signing-keys">
-  <title>werds</title>
-  <para>
-   First, create a host key:
-  </para>
-  <screen>&prompt.user;<command>ssh-keygen -s <replaceable>ca_host_key -I certificate_ID id_rsa.pub</replaceable>
- </sect2>
 
- </sect1>-->
+ <sect2 xml:id="sec-ssh-certificate-create-signing-keys">
+  <title>Creating a new trusted server</title>
+  <para>
+   Use a well-secured machine to act as your trusted server.
+   The following examples create two CAs, one for servers and one
+   for clients, stored in <filename>/root/.ssh/ca-host</filename>
+   and <filename>/root/.ssh/ca-user</filename>. You may store them wherever
+   you want. Give them strong passphrases:
+  </para>
+  <screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>HOST_CA</replaceable></command>
+Generating public/private rsa key pair.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in HOST_CA
+Your public key has been saved in HOST_CA.pub
+The key fingerprint is:
+SHA256:R32ucwA+o0t9lPaDdSibbVZbDyEVFUXXrmkLiI8E2Mw admin@trustedserver
+The key's randomart image is:
++---[RSA 3072]----+
+|              o=O|
+|           . .  o|
+|     =    o o o. |
+|    . E  o . = o.|
+|       .S.=.* =o+|
+|        o+.=.@+++|
+|       .oo. BoBo.|
+|       ..... =.. |
+|        .        |
++----[SHA256]-----+</screen>
+
+<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>USER_CA</replaceable></command></screen>
+  <para>
+   Now sign the trusted server's host key:
+  </para>
+  <screen>&prompt.sudo;<command>ssh-keygen -s <replaceable>/root/.ssh/HOST_CA -I trusted-server -h -Z trustedserver.example.com -V +52 /etc/ssh/ssh_host_ed25519.pub</replaceable></command>
+[sudo] password for admin:
+Enter passphrase:
+Signed host key /etc/ssh/ssh_host_ed25519.pub: id "trusted-server" serial 0 valid from 2022-07-07T11:01:00 to 2022-07-07T11:02:53
+    </screen>
+   <para>
+  aaargh distributing certs
+
+  </para>
+ </sect2>
+ </sect1>
 
  <sect1 xml:id="sec-ssh-gnome-keyring">
   <title>Automated public key logins with gnome-keyring</title>
