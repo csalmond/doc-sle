@@ -911,13 +911,19 @@ Have a lot of fun...</screen>
   </para>
   </listitem>
  </itemizedlist>
+   <para>
+   Note that SSH certificates follow the OpenPGP standard, rather than
+   SSL/TLS, and that the certificate format is OpenPGP, not X509.
+  </para>
 
  <sect2 xml:id="sec-ssh-certificate-create-signing-keys">
   <title>Setting up a new trusted server</title>
   <para>
+   In this section, you will set up a trusted server and one test client.
    Use a well-secured machine to act as your trusted server.
-   The following examples create two certificate signing keys, one for servers
-   and one for clients, stored in <replaceable>/root/.ssh/CA-HOST-SIGN-KEY</replaceable>
+   The following examples create two certificate signing keys, one for
+   servers and one for clients, stored in
+   <replaceable>/root/.ssh/CA-HOST-SIGN-KEY</replaceable>
    and <replaceable>/root/.ssh/CA-USER-SIGN-KEY</replaceable>. You may store
    them wherever you want. Give them strong passphrases:
   </para>
@@ -942,7 +948,27 @@ The key's randomart image is:
 |        .        |
 +----[SHA256]-----+</screen>
 
-<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>CA-USER-SIGN-KEY</replaceable></command></screen>
+<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>CA-USER-SIGN-KEY</replaceable></command>
+Generating public/private rsa key pair.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in CA-USER-SIGN-KEY
+Your public key has been saved in CA-USER-SIGN-KEY.pub
+The key fingerprint is:
+SHA256:Hzvk16KaNElh0iDRM/5WMuUxuMv44D+AJ82fboNWtSQ admin@trustedserver
+The key's randomart image is:
++---[RSA 3072]----+
+|    oo.  .       |
+|     .+o. +      |
+|     ..o++ o     |
+|      .oE.=      |
+|     + +SOo.     |
+|    o B.*=.o .   |
+|     + O+.= o .  |
+|      +.Bo + .   |
+|     . +=+.      |
++----[SHA256]-----+ </screen>
+
 <para>
    Sign the trusted server's public host key to create the server's own host
    certificate:
@@ -996,9 +1022,24 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "trusted-server" serial 0 vali
 
    <!-- user certs -->
    <para>
-    Add the new certificate to <filename>/etc/ssh/sshd_config</filename>:
+    Add the new host certificate to
+    <filename>/etc/ssh/sshd_config</filename>,
+    to make it available to clients:
    </para>
-   <screen>TrustedUserCAKeys /etc/ssh/ca_user_key.pub</screen>
+   <screen>HostCertificate <replaceable>/etc/ssh/ssh_host_ed25519_key-cert.pub</replaceable></screen>
+   <para>
+    Restart <systemitem class="daemon">sshd</systemitem> to load your
+    changes:
+   </para>
+   <screen>&prompt.user;<command>sudo systemctl restart sshd.service</command></screen>
+   <para>
+    On your test client, edit all <filename>known_hosts</filename> files.
+    Each user can have their own <filename>~/.ssh/known_hosts</filename>,
+    and check for a global <filename>known_hosts</filename> file in
+    <filename>/etc/ssh</filename>. Delete all existing entries, and replace
+    them
+
+
 
   </sect2>
  </sect1>
