@@ -866,15 +866,16 @@ Have a lot of fun...</screen>
   <para>
    OpenSSH introduced certificate authentication in OpenSSH 5.4. This is
    similar to an OpenSSL certificate authority (CA), and serves a similar
-   purpose: it uses signed encryption certificates instead of keys, and
-   it provides central management for server and client certificates.
+   purpose: servers and clients authenticate to each other with
+   digitally-signed encryption certificates instead of encryption keys, and
+   it enables central management for server and client certificates.
   </para>
   <para>
-   Certificates consist of a public key, a user-defined identity string, zero
-   or more user or host names, and a set of options that are signed by a
-   Certificate Authority (CA) key. Clients or servers trust the CA key, and
-   verify its signature on a certificate, rather than trusting multiple user
-   and host keys.
+   Certificates consist of a public key, a user-defined identity string,
+   zero or more user names or host names, and a set of other options.
+   Certificates are signed by a Certificate Authority (CA) signing key.
+   Clients and servers trust the CA key, and verify its signature on a
+   certificate, rather than trusting user and host keys.
   </para>
   <para>
    Traditional OpenSSH public key authentication requires copying client
@@ -917,24 +918,51 @@ Have a lot of fun...</screen>
   </para>
 
  <sect2 xml:id="sec-ssh-certificate-create-signing-keys">
-  <title>Setting up a new trusted server</title>
+  <title>Setting up a new certificate authority</title>
   <para>
-   In this section, you will set up a trusted server and one test client.
-   Use a well-secured machine to act as your trusted server.
-   The following examples create two certificate signing keys, one for
-   servers and one for clients, stored in
-   <replaceable>/root/.ssh/CA-HOST-SIGN-KEY</replaceable>
-   and <replaceable>/root/.ssh/CA-USER-SIGN-KEY</replaceable>. You may store
-   them wherever you want. Give them strong passphrases:
+   This section describes how to set up a new certificate
+   authority (CA). Some thought and planning will keep it manageable
+   and efficient.
   </para>
-  <screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>CA-HOST-SIGN-KEY</replaceable></command>
+  <important>
+   <title>Protect your certificate authority</title>
+   <para>
+    It is extremely important to protect the machine that hosts
+    your certificate authority. Your CA is literally the key to
+    your entire network. Anyone who gains access to your CA can
+    create their own certificates and freely access your network
+    resources, or even compromise your servers and the CA itself.
+    You could even use a dedicated machine that is started only
+    when you need to sign keys.
+   </para>
+  </important>
+   <para>
+    It is a best practice to create one signing key for servers,
+    and another signing key for clients. You could create separate
+    CAs for users and clients, on separate machines. The more certificates
+    you have to manage, the more important thoughtful organization
+    becomes.
+   </para>
+   <para>
+    Give your CA its own directory, and do not use <filename>/etc</filename>
+    or <filename>/root</filename>. <filename>/etc</filename> is for local
+    configuration files, and <filename>/root</filename> is the home
+    directory for the root user. The examples in this section use
+    <filename>/usr/local/ca-ssh</filename>.
+   </para>
+   <para>
+    The following examples create two signing keys, one for
+    signing host keys on servers, and one for user keys. Give them strong
+    passphrases:
+  </para>
+  <screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>/usr/local/ca-ssh/CA-HOST-SIGN-KEY</replaceable></command>
 Generating public/private rsa key pair.
 Enter passphrase (empty for no passphrase):
 Enter same passphrase again:
-Your identification has been saved in CA-HOST-SIGN-KEY
-Your public key has been saved in CA-HOST-SIGN-KEY.pub
+Your identification has been saved in /usr/local/ca-ssh/CA-HOST-SIGN-KEY
+Your public key has been saved in /usr/local/ca-ssh/CA-HOST-SIGN-KEY.pub
 The key fingerprint is:
-SHA256:R32ucwA+o0t9lPaDdSibbVZbDyEVFUXXrmkLiI8E2Mw admin@trustedserver
+SHA256:R32ucwA+o0t9lPaDdSibbVZbDyEVFUXXrmkLiI8E2Mw admin@caserver
 The key's randomart image is:
 +---[RSA 3072]----+
 |              o=O|
@@ -948,12 +976,12 @@ The key's randomart image is:
 |        .        |
 +----[SHA256]-----+</screen>
 
-<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>CA-USER-SIGN-KEY</replaceable></command>
+<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>/usr/local/ca-ssh/CA-USER-SIGN-KEY</replaceable></command>
 Generating public/private rsa key pair.
 Enter passphrase (empty for no passphrase):
 Enter same passphrase again:
-Your identification has been saved in CA-USER-SIGN-KEY
-Your public key has been saved in CA-USER-SIGN-KEY.pub
+Your identification has been saved in /usr/local/ca-ssh/CA-USER-SIGN-KEY
+Your public key has been saved in /usr/local/ca-ssh/CA-USER-SIGN-KEY.pub
 The key fingerprint is:
 SHA256:Hzvk16KaNElh0iDRM/5WMuUxuMv44D+AJ82fboNWtSQ admin@trustedserver
 The key's randomart image is:
@@ -970,12 +998,13 @@ The key's randomart image is:
 +----[SHA256]-----+ </screen>
 
 <para>
-   Sign the trusted server's public host key to create the server's own host
+   Sign the CA host's public host key to create the server's own host
    certificate:
   </para>
-  <screen>&prompt.sudo;<command>ssh-keygen -s <replaceable>/root/.ssh/CA-HOST-SIGN-KEY</replaceable> -I <replaceable>"trusted-server host cert"</replaceable> -h -V +1h <replaceable>/etc/ssh/ssh_host_ed25519.pub</replaceable></command>
+  <screen>&prompt.sudo;<command>ssh-keygen -s <replaceable>/usr/local/ca-ssh/CA-HOST-SIGN-KEY</replaceable> -I <replaceable>"ca-server host cert"</replaceable> -h -V +1h <replaceable>/etc/ssh/ssh_host_ed25519.pub</replaceable></command>
 Enter passphrase:
-Signed host key /etc/ssh/ssh_host_ed25519.pub: id "trusted-server" serial 0 valid from 2022-07-07T11:01:00 to 2022-07-07T12:02:53
+Signed host key /etc/ssh/ssh_host_ed25519.pub: id "ca-server host cert"
+ serial 0 valid from 2022-07-31T11:01:00 to 2022-07-31T12:02:53
     </screen>
     <itemizedlist>
      <listitem>
@@ -997,9 +1026,10 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "trusted-server" serial 0 vali
     </listitem>
     <listitem>
      <para>
-      <option>-V</option> sets the expiration date for the certificate. In the
-      example, the certificate expires in one hour. Short expirations are
-      useful for testing.
+      <option>-V</option> sets the expiration date for the certificate. In
+      the example, the certificate expires in one hour. Short expirations
+      are useful for testing. (See the "-V validity_interval" section of
+      <command>man 1 ssh-keygen</command> for allowed time formats.)
      </para>
     </listitem>
    </itemizedlist>
@@ -1010,8 +1040,9 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "trusted-server" serial 0 vali
 /etc/ssh/ssh_host_ed25519_key-cert.pub:
         Type: ssh-ed25519-cert-v01@openssh.com host certificate
         Public key: ED25519-CERT SHA256:c6Oy0PwQ4de04cdJZDquiyo9qJZMNziDreHMRZ3HPNA
-        Signing CA: RSA SHA256:QyHUEUE1hnM9uYX5dAB4uWdAn+rPsTf04qsE0uL8LsQ (using rsa-sha2-512)
-        Key ID: "trusted-server host cert"
+        Signing CA: RSA SHA256:QyHUEUE1hnM9uYX5dAB4uWdA
+          n+rPsTf04qsE0uL8LsQ (using rsa-sha2-512)
+        Key ID: "ca-server host cert"
         Serial: 0
         Valid: from 2022-07-07T11:01:00 to 2022-07-07T12:02:53
         Principals: (none)
@@ -1032,12 +1063,14 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "trusted-server" serial 0 vali
     changes:
    </para>
    <screen>&prompt.user;<command>sudo systemctl restart sshd.service</command></screen>
+
    <para>
     On your test client, edit all <filename>known_hosts</filename> files.
     Each user can have their own <filename>~/.ssh/known_hosts</filename>,
     and check for a global <filename>known_hosts</filename> file in
     <filename>/etc/ssh</filename>. Delete all existing entries, and replace
     them
+   </para>
 
 
 
