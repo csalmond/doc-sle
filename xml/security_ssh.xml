@@ -864,36 +864,33 @@ Have a lot of fun...</screen>
   <sect1 xml:id="sec-ssh-certificate-auth">
   <title>OpenSSH certificate authentication</title>
   <para>
-   OpenSSH introduced certificate authentication in OpenSSH 5.4. This is
-   similar to an OpenSSL certificate authority (CA), and serves a similar
-   purpose: servers and clients authenticate to each other with
-   digitally-signed encryption certificates instead of encryption keys, and
-   it enables central management for server and client certificates.
+   OpenSSH introduced certificate authentication in OpenSSH 5.4. Servers and
+   users authenticate to each other with digitally-signed encryption
+   certificates instead of encryption keys, and it enables central
+   management for server and user certificates.
   </para>
   <para>
-   Certificates consist of a public key, a user-defined identity string,
-   zero or more user names or host names, and a set of other options.
+   Certificates consist of a public encryption key, a user-defined identity
+   string, zero or more user names or host names, and other options.
    Certificates are signed by a Certificate Authority (CA) signing key.
-   Clients and servers trust the CA key, and verify its signature on a
-   certificate, rather than trusting user and host keys.
+   Users and servers trust the CA key, and verify its signature on a
+   certificate, rather than trusting user and server host encryption keys.
   </para>
   <para>
-   Traditional OpenSSH public key authentication requires copying client
+   Traditional OpenSSH public key authentication requires copying user
    public keys to every SSH server they need access to, and relying on
    users to verify new SSH server host keys before accepting them. This is
    error-prone and complicated to manage. Another weakness is OpenSSH keys
    never expire.
   </para>
   <para>
-   If you are used to managing OpenSSL certificate authorities, you will
-   find that managing an OpenSSH CA is simpler. The basic principles are
-   similar:
+   Setting up an OpenSSH certificate authority involves the following steps:
   </para>
  <itemizedlist>
   <listitem>
   <para>
-   Set up a trusted server to host your certificate authority, and for
-   creating and signing new host and client keys.
+   Set up a secure trusted server to host your certificate authority,
+   and for creating and signing new server and user keys.
   </para>
   </listitem>
   <listitem>
@@ -903,12 +900,14 @@ Have a lot of fun...</screen>
   </listitem>
   <listitem>
   <para>
-   Create, sign, and distribute client keys.
+   Create, sign, and distribute user keys.
   </para>
   </listitem>
   <listitem>
   <para>
-   revoke
+   Revoke certificates as needed, for example when you suspect a certificate
+   has been compromised, a user has left your organization, or a server has
+   been retired.
   </para>
   </listitem>
  </itemizedlist>
@@ -921,8 +920,9 @@ Have a lot of fun...</screen>
   <title>Setting up a new certificate authority</title>
   <para>
    This section describes how to set up a new certificate
-   authority (CA). Some thought and planning will keep it manageable
-   and efficient.
+   authority (CA). It is a best practice to carefully consider
+   how you want to organize your CA, to keep it manageable and
+   efficient.
   </para>
   <important>
    <title>Protect your certificate authority</title>
@@ -932,80 +932,90 @@ Have a lot of fun...</screen>
     your entire network. Anyone who gains access to your CA can
     create their own certificates and freely access your network
     resources, or even compromise your servers and the CA itself.
-    You could even use a dedicated machine that is started only
+    A common practice is to use a dedicated machine that is started only
     when you need to sign keys.
    </para>
   </important>
    <para>
     It is a best practice to create one signing key for servers,
-    and another signing key for clients. You could create separate
-    CAs for users and clients, on separate machines. The more certificates
-    you have to manage, the more important thoughtful organization
-    becomes.
+    and another signing key for clients. If you have a large number of
+    certificates to manage, it can be helpful to create your
+    CAs for hosts and clients on separate machines. If you prefer
+    using a single machine, give each CA its own directory.
+    Do not use <filename>/etc</filename> or <filename>/root</filename>.
+    <filename>/etc</filename> is for local configuration files, and
+    <filename>/root</filename> is the home directory for the root user. The
+    examples in this section use <filename>/ca-ssh-host</filename>
+    and <filename>/ca-ssh-client</filename>.
    </para>
    <para>
-    Give your CA its own directory, and do not use <filename>/etc</filename>
-    or <filename>/root</filename>. <filename>/etc</filename> is for local
-    configuration files, and <filename>/root</filename> is the home
-    directory for the root user. The examples in this section use
-    <filename>/usr/local/ca-ssh</filename>.
-   </para>
-   <para>
-    The following examples create two signing keys, one for
-    signing host keys on servers, and one for user keys. Give them strong
-    passphrases:
+    The following examples create two signing keys, one for signing server
+    host keys, and one for user keys. Give them strong passphrases:
   </para>
-  <screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>/usr/local/ca-ssh/CA-HOST-SIGN-KEY</replaceable></command>
+  <screen>&prompt.sudo;<command>sudo ssh-keygen -f <replaceable>/ca-ssh-server/ca-server-sign-key</replaceable></command>
 Generating public/private rsa key pair.
 Enter passphrase (empty for no passphrase):
 Enter same passphrase again:
-Your identification has been saved in /usr/local/ca-ssh/CA-HOST-SIGN-KEY
-Your public key has been saved in /usr/local/ca-ssh/CA-HOST-SIGN-KEY.pub
+Your identification has been saved in
+ /ca-ssh-server/ca-server-sign-key
+Your public key has been saved in
+ /ca-ssh-server/ca-server-sign-key.pub
 The key fingerprint is:
-SHA256:R32ucwA+o0t9lPaDdSibbVZbDyEVFUXXrmkLiI8E2Mw admin@caserver
+SHA256:uwAbTRaQ9hHaIsxUmILxcpERvR6bFPJ6f root@caserver
 The key's randomart image is:
 +---[RSA 3072]----+
-|              o=O|
-|           . .  o|
-|     =    o o o. |
-|    . E  o . = o.|
-|       .S.=.* =o+|
-|        o+.=.@+++|
-|       .oo. BoBo.|
-|       ..... =.. |
-|        .        |
-+----[SHA256]-----+</screen>
+|o.=Oo+E+         |
+|o==.*o*.o        |
+|..*=oB+*         |
+| o .B=o .        |
+|   +o=. S        |
+|  . =+o  .       |
+|   ....o.        |
+|      ....       |
+|       ..        |
++----[SHA256]-----+
+</screen>
 
-<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>/usr/local/ca-ssh/CA-USER-SIGN-KEY</replaceable></command>
+<screen>&prompt.sudo;<command>ssh-keygen -f <replaceable>/ca-ssh-user/ca-user-sign-key</replaceable></command>
 Generating public/private rsa key pair.
 Enter passphrase (empty for no passphrase):
 Enter same passphrase again:
-Your identification has been saved in /usr/local/ca-ssh/CA-USER-SIGN-KEY
-Your public key has been saved in /usr/local/ca-ssh/CA-USER-SIGN-KEY.pub
+Your identification has been saved in
+ /ca-ssh-user/ca-user-sign-key
+Your public key has been saved in
+ /ca-ssh-user/ca-user-sign-key.pub
 The key fingerprint is:
-SHA256:Hzvk16KaNElh0iDRM/5WMuUxuMv44D+AJ82fboNWtSQ admin@trustedserver
+SHA256:Fm0ApNggXVOD7rlP+IH+Z0XdglrQe9d06ov+ root@caserver
 The key's randomart image is:
 +---[RSA 3072]----+
-|    oo.  .       |
-|     .+o. +      |
-|     ..o++ o     |
-|      .oE.=      |
-|     + +SOo.     |
-|    o B.*=.o .   |
-|     + O+.= o .  |
-|      +.Bo + .   |
-|     . +=+.      |
-+----[SHA256]-----+ </screen>
+|....o+=...       |
+| ..+.o ..o.     o|
+|  ..o   ..o+ . +.|
+|    .    o= + + .|
+|   . .  S+ . +   |
+|    oo .. .   .  |
+|    o.o  .   o...|
+|   ..o .o   +oo..|
+|    .o+o   .+E+. |
++----[SHA256]-----+
+
+ </screen>
 
 <para>
-   Sign the CA host's public host key to create the server's own host
-   certificate:
+   Sign the CA server's public host key to create the server's own server
+   host certificate:
   </para>
-  <screen>&prompt.sudo;<command>ssh-keygen -s <replaceable>/usr/local/ca-ssh/CA-HOST-SIGN-KEY</replaceable> -I <replaceable>"ca-server host cert"</replaceable> -h -V +1h <replaceable>/etc/ssh/ssh_host_ed25519.pub</replaceable></command>
+  <screen>&prompt.sudo;<command>ssh-keygen -s <replaceable>/ca-ssh-host/ca-host-sign-key</replaceable></command> \
+   <command>-n <replaceable>root,&wsII;,&wsIIname;</replaceable> -I <replaceable>"ca-server host cert"</replaceable></command> \
+   <command>-h -V +1h <replaceable>/etc/ssh/ssh_host_ed25519_key.pub</replaceable></command>
 Enter passphrase:
-Signed host key /etc/ssh/ssh_host_ed25519.pub: id "ca-server host cert"
- serial 0 valid from 2022-07-31T11:01:00 to 2022-07-31T12:02:53
+Signed host key /etc/ssh/ssh_host_ed25519_key-cert.pub: id
+"ca-server host cert" serial 0 for root,venus,venus.example.com
+valid from 2022-08-08T14:20:00 to 2022-08-08T15:21:19
     </screen>
+      <para>
+       If you have multiple server host keys, sign all of them.
+      </para>
     <itemizedlist>
      <listitem>
       <para>
@@ -1014,8 +1024,16 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "ca-server host cert"
      </listitem>
      <listitem>
       <para>
-       <option>-I</option> is the optional identity string. This is any
-       comment or description you want. This string is logged, to help you
+       <option>-n</option> is your list of principals. By default,
+       certificates are valid for all users and hosts. Principals are a
+       comma-delimited list of user or host names, limiting access to hosts
+       from the specified users or hosts. See TODO for more information.
+      </para>
+     </listitem>
+     <listitem>
+      <para>
+       <option>-I</option> is the identity string. This is any
+       comment or description you want. The string is logged, to help you
        quickly find relevant log entries.
       </para>
      </listitem>
@@ -1036,25 +1054,28 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "ca-server host cert"
    <para>
     Verify that your new certicate is built the way you want:
    </para>
-   <screen>&prompt.user;<command>ssh-keygen -L -f /etc/ssh/ssh_host_ed25519_key-cert.pub</command>
-/etc/ssh/ssh_host_ed25519_key-cert.pub:
+   <screen>&prompt.user;<command>ssh-keygen -Lf /etc/ssh/ssh_host_ed25519_key-cert.pub</command>
+ /etc/ssh/ssh_host_ed25519_key-cert.pub:
         Type: ssh-ed25519-cert-v01@openssh.com host certificate
-        Public key: ED25519-CERT SHA256:c6Oy0PwQ4de04cdJZDquiyo9qJZMNziDreHMRZ3HPNA
-        Signing CA: RSA SHA256:QyHUEUE1hnM9uYX5dAB4uWdA
-          n+rPsTf04qsE0uL8LsQ (using rsa-sha2-512)
+        Public key: ED25519-CERT SHA256:/U7C+qABXYyuvueUuhFKzzVINq3d7IULRLwBstvVC+Q
+        Signing CA: RSA SHA256:uwAbTRaQ9hHaIsxUmILxcpERvR6bFPJ6
+         (using rsa-sha2-512)
         Key ID: "ca-server host cert"
         Serial: 0
-        Valid: from 2022-07-07T11:01:00 to 2022-07-07T12:02:53
-        Principals: (none)
+        Valid: from 2022-08-08T14:20:00 to 2022-08-08T15:21:19
+        Principals:
+                root
+                venus
+                venus.example.com
         Critical Options: (none)
-        Extensions: (none)</screen>
+        Extensions: (none)
+    </screen>
 
        <!--principals, extensions, revocation, ~/.ssh/config TODO -->
 
    <!-- user certs -->
    <para>
-    Add the new host certificate to
-    <filename>/etc/ssh/sshd_config</filename>,
+    Add the new host certificate to <filename>/etc/ssh/sshd_config</filename>,
     to make it available to clients:
    </para>
    <screen>HostCertificate <replaceable>/etc/ssh/ssh_host_ed25519_key-cert.pub</replaceable></screen>
@@ -1063,7 +1084,10 @@ Signed host key /etc/ssh/ssh_host_ed25519.pub: id "ca-server host cert"
     changes:
    </para>
    <screen>&prompt.user;<command>sudo systemctl restart sshd.service</command></screen>
+  </sect2>
 
+  <sect2 xml:id="sec-ssh-certificate-test-client">
+   <title>Configuring a client</title>
    <para>
     On your test client, edit all <filename>known_hosts</filename> files.
     Each user can have their own <filename>~/.ssh/known_hosts</filename>,
