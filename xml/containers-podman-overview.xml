@@ -68,7 +68,7 @@
    the current user, run the following command:
   </para>
 
-<screen>&prompt.user; sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 <replaceable>USER</replaceable></screen>
+<screen>&prompt.user; sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 <replaceable>$USER</replaceable></screen>
 
   <para>
    Reboot the machine to enable the change. Instead of rebooting, you can stop
